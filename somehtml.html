@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<!-- For reloading pages, use: js - history, replace state and more...-->
+<html>
+	<head>
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	</head>
+	<body>
+		1:{%pyif var %}
+		<h1 style="color: (%py color %)"> (%py header %) </h1>
+		(%py txt %)
+		<(%py type %) style="font-size: 40px">(%py txt %)</(%py type %)>
+		1:{%pyelif var2 %}
+		<(%py type %) style="color: yellow">Welcome!</(%py type %)>
+		1:{%pyelse%}
+		2:{%pyif n1 %}
+		<(%py type %)>Here you'll find interesting things!</(%py type %)>
+		2:{%pyelse%}
+		<p style="font-size: 20px">Of course you will...!</p>
+		2:{%pyendif%}
+		<p style="color: rgb(100, 220, 150); font-size: 30px">Yep!</p>
+		1:{%pyendif%}
+	</body>
+</html>
