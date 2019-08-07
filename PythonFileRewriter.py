@@ -1,8 +1,9 @@
-import re
+# import re
 
 """SYNTAX = {1: ("{%py", "%}"), 2: ("{!%py", "!%}"), 3: ("-#py", "#-"), 4: ("-!#py", "#!-"), 5: ("-%py", "%-"),
           6: ("!@py", "@!"), 7: ("~{py", "}~"), 8: ("{@py", "@}")}""" # Have to be from groups of 2 or 3 with the char between the two
 SYNTAX = {1: ("(%py", "%)")}
+ADD_FILE = {1: ("(!py", "!)")}
 IFS = {1: {"if": ("{%pyif", "%}"), "elif": ("{%pyelif", "%}"), "else": "{%pyelse%}", "endif": "{%pyendif%}"}}
 
 # Should be written as:     1:{%pyif variable %}
@@ -41,9 +42,9 @@ class DataConnection:
         :type edit_method: bool
         :type binary_encoded: bool
         """
-        self.syntax = [1]
-        self.max_c = 1
-        self.edit_method = edit_method
+        self.__syntax = [1]
+        self.__max_c = 1
+        self.__edit_method = edit_method
         self.binary_encoded = binary_encoded
     """
     def set_syntax(self, syntax: str):
@@ -51,13 +52,13 @@ class DataConnection:
         if len(syntax) == 1:
             if not syntax.isdigit():
                 raise Exception("Invalid syntax Input!")
-            self.syntax = [int(syntax)]
+            self.__syntax = [int(syntax)]
         elif len(syntax.split(",")) > 1:
             list_syntax = syntax.split(",")
             for x in list_syntax:
                 if not x.isdigit():
                     raise Exception("Invalid syntax input!")
-            self.syntax = list(map(int, list_syntax))
+            self.__syntax = list(map(int, list_syntax))
         elif len(syntax.split("-")) > 1:
             list_syntax = syntax.split("-")
             if len(list_syntax) > 2:
@@ -65,7 +66,7 @@ class DataConnection:
             for x in list_syntax:
                 if not x.isdigit():
                     raise Exception("Invalid syntax input!")
-            self.syntax = list(range(int(list_syntax[0]), int(list_syntax[1]) + 1))
+            self.__syntax = list(range(int(list_syntax[0]), int(list_syntax[1]) + 1))
     """
 
     def change_max_c(self, num: int):
@@ -77,45 +78,34 @@ class DataConnection:
         :return: Nothing
         """
         if 1 <= num <= 10:
-            self.max_c = num
+            self.__max_c = num
         else:
             raise Exception("Invalid amount of digits for the max -for- number!")
 
-    def edit_variables_data(self, data: str, variables: dict = {}):
+    def edit_variables_data1(self, data: str, main_variables: dict = {}, side_variables: dict = {}):
         """
         The function rewrites the right variables and process if statements in the given code.
         :param data: The given code
-        :param variables: The variables for the function to edit
+        :param main_variables: The variables for the function to edit
+        :param side_variables: The side part of variables to use
         :type data: str
-        :type variables: dict
+        :type main_variables: dict
+        :type side_variables: dict
         :return: The new processed code
         :rtype: str
         """
-        # Variables processor
+
         if self.binary_encoded:
             data = data.decode()
         new_data = data
-        for x in self.syntax:
-            start_p, end_p = SYNTAX.get(x)
-            if start_p in data and end_p in data:
-                m_start, m_end = 0, 0
-                while data[m_start:].find(start_p) != -1 and data[m_end:].find(end_p) != -1:
-                    old_m_start, old_m_end = m_start, m_end
-                    m_start = data[old_m_start:].find(start_p) + old_m_start
-                    m_end = data[old_m_end:].find(end_p) + old_m_end
-                    new_str = "".join(data[m_start + len(start_p): m_end].split())
-                    if new_str in variables.keys():
-                        new_data = new_data.replace(data[m_start: m_end + len(end_p)], variables.get(new_str))
-                    m_start += 1
-                    m_end += 1
 
         # if statement checker
-        for x in self.syntax:
+        for x in self.__syntax:
             while IFS.get(x).get("if")[0] in new_data:
                 ifs = IFS.get(x).get("if")
                 ifp = new_data.find(IFS.get(x).get("if")[0])
-                num_chk = new_data[ifp - self.max_c - 1: ifp]
-                if num_chk[:self.max_c].isdigit() and num_chk[-1] == ":":
+                num_chk = new_data[ifp - self.__max_c - 1: ifp]
+                if num_chk[:self.__max_c].isdigit() and num_chk[-1] == ":":
                     worked = False
                     last_start = None
                     els_work = False
@@ -123,10 +113,10 @@ class DataConnection:
                         if k == "if":
                             if ifp - len(num_chk) >= 0:
                                 ifp_cls = ifp + len(ifs[0]) + new_data[ifp + len(ifs[0]):].find(ifs[1])
-                                print("cls:", ifp_cls)
+                                # print("cls:", ifp_cls)
                                 if ifp_cls != -1:
                                     new_str = "".join(new_data[ifp + len(ifs[0]): ifp_cls].split())
-                                    if variables.get(new_str):
+                                    if main_variables.get(new_str):
                                         worked = True
                                         new_data = new_data.replace(num_chk + new_data[ifp: ifp_cls + len(ifs[1])], "")
                                     else:
@@ -136,24 +126,25 @@ class DataConnection:
                             else:
                                 raise Exception("Invalid numbering of if statements!")
                         elif k == "elif":
-                            ifs = IFS.get(x).get(k)
-                            while new_data[ifp:].find(num_chk + ifs[0]) != -1:
+                            ifs = v
+                            while (num_chk + ifs[0]) in new_data[ifp:]:
                                 old_ifp = ifp
+                                # print("OLD IFP", new_data[ifp:ifp+40])
                                 ifp = new_data[old_ifp:].find(num_chk + ifs[0]) + len(num_chk) + len(new_data[:old_ifp])
                                 if ifp - len(num_chk) - len(new_data[:old_ifp]) >= 0:
                                     if worked and last_start is None:
                                         last_start = ifp - len(num_chk)
                                     elif not worked:
-                                        old_ifp -= len(new_data[last_start:ifp - len(num_chk)])
+                                        # old_ifp -= len(new_data[last_start:ifp - len(num_chk)])
                                         new_data = new_data.replace(new_data[last_start:ifp - len(num_chk)], "")
-                                        ifp = new_data[old_ifp:].find(num_chk + ifs[0]) + len(num_chk) + len(new_data[:old_ifp])
-                                        if ifp - len(num_chk) - len(new_data[:old_ifp]) >= 0:
+                                        ifp = new_data[old_ifp - len(num_chk):].find(num_chk + ifs[0]) + old_ifp
+                                        if ifp - len(new_data[:old_ifp - len(num_chk)]) >= 0:
                                             ifp_cls = ifp + len(ifs[0]) + new_data[ifp + len(ifs[0]):].find(ifs[1])
-                                            print("DATA:", new_data[ifp:], ifs[1], new_data[ifp:])
+                                            # print("DATA:", new_data[ifp:], ifs[1], new_data[ifp:])
                                             if ifp_cls != -1:
                                                 new_str = "".join(new_data[ifp + len(ifs[0]): ifp_cls].split())
-                                                print("The new string is:", new_str, " or: ", new_data[ifp + len(ifs): ifp_cls])
-                                                if variables.get(new_str):
+                                                # print("The new string is:", new_str, " or: ", new_data[ifp + len(ifs): ifp_cls])
+                                                if main_variables.get(new_str):
                                                     worked = True
                                                     last_start = None
                                                     new_data = new_data.replace(num_chk + new_data[ifp: ifp_cls + len(ifs[1])], "")
@@ -166,7 +157,7 @@ class DataConnection:
                                 else:
                                     raise Exception("Invalid numbering of elif statements!")
                         elif k == "else":
-                            ifs = IFS.get(x).get(k)
+                            ifs = v
                             ifp = new_data.find(num_chk + ifs) + len(num_chk)
                             if ifp - len(num_chk) >= 0:
                                 if worked and last_start is None:
@@ -176,7 +167,7 @@ class DataConnection:
                                     new_data = new_data.replace(new_data[last_start: ifp - len(num_chk)], "")
                                     new_data = new_data.replace(num_chk + ifs, "")
                         elif k == "endif":
-                            ifs = IFS.get(x).get(k)
+                            ifs = v
                             ifp = new_data.find(num_chk + ifs) + len(num_chk)
                             if ifp - len(num_chk) >= 0:
                                 if not els_work and last_start is not None:
@@ -187,10 +178,44 @@ class DataConnection:
                 else:
                     raise Exception("Invalid numbering of different if statements!")
 
+        # Variables processor
+        for x in self.__syntax:
+            start_p, end_p = SYNTAX.get(x)
+            if start_p in new_data and end_p in new_data:
+                m_start, m_end = 0, 0
+                while start_p in new_data[m_start:] and end_p in new_data[m_end:]:
+                    old_m_start, old_m_end = m_start, m_end
+                    m_start = new_data[old_m_start:].find(start_p) + old_m_start
+                    m_end = new_data[old_m_end:].find(end_p) + old_m_end
+                    new_str = "".join(new_data[m_start + len(start_p): m_end].split())
+                    new_data = new_data.replace(new_data[m_start: m_end + len(end_p)], main_variables.get(new_str, ''))
+                    m_start += 1
+                    m_end += 1
+
+        # Reading files into the data
+        for x in self.__syntax:
+            start_p, end_p = ADD_FILE.get(x)
+            if start_p in data and end_p in new_data:
+                m_start, m_end = 0, 0
+                while start_p in new_data[m_start:] and end_p in new_data[m_end:]:
+                    old_m_start, old_m_end = m_start, m_end
+                    m_start = new_data[old_m_start:].find(start_p) + old_m_start
+                    m_end = new_data[old_m_end:].find(end_p) + old_m_end
+                    new_str = "".join(new_data[m_start + len(start_p): m_end].split())
+                    try:
+                        f = open(new_str, "r")
+                        in_file_data = self.edit_variables_data1(f.read(), side_variables)
+                        new_data = new_data.replace(new_data[m_start: m_end + len(end_p)], in_file_data)
+                        f.close()
+                    except IOError as e:
+                        print("Invalid opening of the file -", new_str, ":", e)
+                    m_start += 1
+                    m_end += 1
+
         return new_data
 
     """def test(self, data: str, variables: dict = {}):
-        for x in self.syntax:
+        for x in self.__syntax:
             worked = {}
             last_start = {}
             for k, v in IFS.get(x).items():
